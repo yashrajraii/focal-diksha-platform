@@ -1,0 +1,106 @@
+{
+ "status": 1,
+ "code": 200,
+ "message": "Bid result",
+ "response": {
+  "response": {
+   "numFound": 3,
+   "start": 0,
+   "docs": [
+    {
+     "b_id": [
+      9932205
+     ],
+     "b_bid_number": [
+      "GEM/2026/B/8070842"
+     ],
+     "b_category_name": [
+      "MACHINE SCREW WITH NUT 30X5MM,NUTBOLT 6MM,SHEET METAL 18 GUAGE 600X600MM,SHEET METAL 18 GUAGE 328X3"
+     ],
+     "b_total_quantity": [
+      920
+     ],
+     "b_bid_type": [
+      1
+     ],
+     "b_eval_type": [
+      0
+     ],
+     "final_start_date_sort": [
+      "2026-09-24T08:59:39Z"
+     ],
+     "final_end_date_sort": [
+      "2026-10-09T09:00:00Z"
+     ],
+     "ba_official_details_deptName": [
+      "Labour and Employment Department Gujarat"
+     ]
+    },
+    {
+     "b_id": [
+      9909758
+     ],
+     "b_bid_number": [
+      "GEM/2026/B/8051269"
+     ],
+     "b_category_name": [
+      "Kores White Board Both Side White type 3 x 4 Feet,5 Ft Heavy Duty Adjustable Folding Stand for whit"
+     ],
+     "b_total_quantity": [
+      364
+     ],
+     "b_bid_type": [
+      1
+     ],
+     "b_eval_type": [
+      0
+     ],
+     "final_start_date_sort": [
+      "2026-09-17T22:57:39Z"
+     ],
+     "final_end_date_sort": [
+      "2026-10-09T09:00:00Z"
+     ],
+     "ba_official_details_minName": [
+      "Ministry of Home Affairs"
+     ],
+     "ba_official_details_deptName": [
+      "Central Armed Police Forces"
+     ]
+    },
+    {
+     "b_id": [
+      9800001
+     ],
+     "b_bid_number": [
+      "GEM/2026/R/700001"
+     ],
+     "b_category_name": [
+      "Steel Angle Equal Mild 20x20x3mm,M.S. Plate 10mm,Plywood for Gen purpose"
+     ],
+     "b_total_quantity": [
+      40
+     ],
+     "b_bid_type": [
+      2
+     ],
+     "b_eval_type": [
+      0
+     ],
+     "final_start_date_sort": [
+      "2026-10-08T10:00:00Z"
+     ],
+     "final_end_date_sort": [
+      "2026-10-20T15:00:00Z"
+     ],
+     "ba_official_details_minName": [
+      "Ministry of Defence"
+     ],
+     "ba_official_details_deptName": [
+      "Department of Military Affairs"
+     ]
+    }
+   ]
+  }
+ }
+}

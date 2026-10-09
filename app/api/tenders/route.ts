@@ -30,7 +30,7 @@ export async function POST(request:Request){
   try{
     const body=await request.json() as Record<string,unknown>,action=String(body.action||"");
     if(action==="start"){
-      const selected=(Array.isArray(body.sources)?body.sources:[]).filter((s):s is SourceId=>typeof s==="string"&&ENABLED_SOURCES.includes(s as SourceId)).slice(0,3);
+      const selected=(Array.isArray(body.sources)?body.sources:[]).filter((s):s is SourceId=>typeof s==="string"&&ENABLED_SOURCES.includes(s as SourceId)).slice(0,ENABLED_SOURCES.length);
       if(!selected.length)return json({error:"Select at least one available source"},400);
       const cutoff=new Date(Date.now()-2*60_000).toISOString();
       const active=await db().prepare(`SELECT id FROM tender_runs WHERE status='running' AND cancelled=0 AND started_at>=? ORDER BY started_at DESC LIMIT 1`).bind(cutoff).first<{id:string}>();
@@ -40,7 +40,7 @@ export async function POST(request:Request){
       return json({runId:id,startedAt:now,sources:selected});
     }
     if(action==="fetch-source"){
-      const runId=String(body.runId||""),source=String(body.source||"") as SourceId,lookback=Math.max(7,Math.min(90,Number(body.lookback)||30));
+      const runId=String(body.runId||""),source=String(body.source||"") as SourceId,lookback=Math.max(7,Math.min(90,Number(body.lookback)||30)),cursor=typeof body.cursor==="string"&&body.cursor?body.cursor:null;
       if(!ENABLED_SOURCES.includes(source))return json({error:"Source is not enabled"},400);
       const run=await db().prepare(`SELECT * FROM tender_runs WHERE id=?`).bind(runId).first<Record<string,unknown>>();
       if(!run||run.status!=="running")return json({error:"Search run is not active"},409);
@@ -49,12 +49,13 @@ export async function POST(request:Request){
       await db().prepare(`UPDATE tender_runs SET current_source=? WHERE id=?`).bind(source,runId).run();
       const cached=await db().prepare(`SELECT * FROM source_status WHERE source=?`).bind(source).first<Record<string,unknown>>();
       let result:SourceResult;
-      if(shouldUseCache(cached?.last_success_at?String(cached.last_success_at):null)){
+      // Continuation batches always fetch; only a source's first batch may reuse a recent successful result.
+      if(!cursor&&shouldUseCache(cached?.last_success_at?String(cached.last_success_at):null)){
         const rows=await db().prepare(`SELECT l.*, CASE WHEN s.tender_key IS NULL THEN 0 ELSE 1 END AS saved FROM live_tenders l LEFT JOIN saved_live_tenders s ON s.tender_key=l.key WHERE l.source=? AND (l.closing_at IS NULL OR l.closing_at>=?) ORDER BY COALESCE(l.published_at,l.first_discovered_at) DESC`).bind(source,new Date().toISOString()).all();
         result={source,sourceLabel:SOURCES[source].label,status:"partial",pagesChecked:Number(cached.pages_checked||0),listingsInspected:Number(cached.listings_inspected||0),matches:rows.results.map(r=>rowToTender(r as Record<string,unknown>)),checkedAt:String(cached.last_success_at),fromCache:true,coverage:SOURCES[source].reason};
       }else {
-        result=await fetchSource(source,runId,lookback,false);
-        if(!["completed","partial"].includes(result.status)&&cached?.last_success_at){
+        result=await fetchSource(source,runId,lookback,false,cursor);
+        if(!cursor&&!["completed","partial"].includes(result.status)&&cached?.last_success_at){
           const rows=await db().prepare(`SELECT l.*, CASE WHEN s.tender_key IS NULL THEN 0 ELSE 1 END AS saved FROM live_tenders l LEFT JOIN saved_live_tenders s ON s.tender_key=l.key WHERE l.source=? AND (l.closing_at IS NULL OR l.closing_at>=?) ORDER BY COALESCE(l.published_at,l.first_discovered_at) DESC`).bind(source,new Date().toISOString()).all();
           result={...result,matches:rows.results.map(r=>rowToTender(r as Record<string,unknown>)),fromCache:true,error:cacheFallbackMessage(SOURCES[source].label,String(cached.last_success_at))};
         }
@@ -64,8 +65,9 @@ export async function POST(request:Request){
         await db().batch(statements);
       }
       const successful=result.status==="completed"||result.status==="partial";
-      await db().prepare(`INSERT INTO source_status (source,status,checked_at,last_success_at,last_error,coverage,pages_checked,listings_inspected,matches_found) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(source) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,last_success_at=CASE WHEN excluded.last_success_at IS NULL THEN source_status.last_success_at ELSE excluded.last_success_at END,last_error=excluded.last_error,coverage=excluded.coverage,pages_checked=excluded.pages_checked,listings_inspected=excluded.listings_inspected,matches_found=excluded.matches_found`).bind(source,result.status,result.checkedAt,successful?result.checkedAt:null,result.error||null,result.coverage,result.pagesChecked,result.listingsInspected,result.matches.length).run();
-      const completedInc=result.status==="completed"?1:0,partialInc=result.status==="partial"?1:0,errorInc=successful?0:1;
+      await db().prepare(`INSERT INTO source_status (source,status,checked_at,last_success_at,last_error,coverage,pages_checked,listings_inspected,matches_found) VALUES (?,?,?,?,?,?,?,?,?) ON CONFLICT(source) DO UPDATE SET status=excluded.status,checked_at=excluded.checked_at,last_success_at=CASE WHEN excluded.last_success_at IS NULL THEN source_status.last_success_at ELSE excluded.last_success_at END,last_error=excluded.last_error,coverage=excluded.coverage,pages_checked=CASE WHEN ? THEN source_status.pages_checked+excluded.pages_checked ELSE excluded.pages_checked END,listings_inspected=CASE WHEN ? THEN source_status.listings_inspected+excluded.listings_inspected ELSE excluded.listings_inspected END,matches_found=CASE WHEN ? THEN source_status.matches_found+excluded.matches_found ELSE excluded.matches_found END`).bind(source,result.status,result.checkedAt,successful?result.checkedAt:null,result.error||null,result.coverage,result.pagesChecked,result.listingsInspected,result.matches.length,cursor?1:0,cursor?1:0,cursor?1:0).run();
+      // Source outcome counters move once per source, on its final batch.
+      const finalBatch=!result.canContinue,completedInc=finalBatch&&result.status==="completed"?1:0,partialInc=finalBatch&&result.status==="partial"?1:0,errorInc=successful?0:1;
       await db().prepare(`UPDATE tender_runs SET current_source=NULL,pages_checked=pages_checked+?,listings_inspected=listings_inspected+?,matches_found=matches_found+?,completed_sources=completed_sources+?,partial_sources=partial_sources+?,error_sources=error_sources+? WHERE id=?`).bind(result.pagesChecked,result.listingsInspected,result.matches.length,completedInc,partialInc,errorInc,runId).run();
       return json(result);
     }

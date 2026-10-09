@@ -10,10 +10,26 @@ export function parseIndianDate(input: string | null): string | null {
   let hour = Number(m[4] ?? 0);
   if (m[6]?.toUpperCase() === "PM" && hour !== 12) hour += 12;
   if (m[6]?.toUpperCase() === "AM" && hour === 12) hour = 0;
-  const utc = Date.UTC(Number(m[3]), month, Number(m[1]), hour - 5, Number(m[5] ?? 0) - 30);
+  const year=Number(m[3]),day=Number(m[1]),minute=Number(m[5]??0);
+  const wall=new Date(Date.UTC(year,month,day,hour,minute));
+  if(wall.getUTCFullYear()!==year||wall.getUTCMonth()!==month||wall.getUTCDate()!==day||wall.getUTCHours()!==hour||wall.getUTCMinutes()!==minute)return null;
+  const utc = Date.UTC(year, month, day, hour - 5, minute - 30);
   const d = new Date(utc);
   if (Number.isNaN(d.getTime())) return null;
   return d.toISOString();
+}
+
+export function parseIndianNumericDate(input:string|null):{dateLabel:string;iso:string|null;timeVerified:boolean}|null{
+  if(!input)return null;
+  const clean=input.replace(/\s+/g," ").trim();
+  const m=clean.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})(?:\s+(\d{1,2}):(\d{2})(?::\d{2})?)?$/);
+  if(!m)return null;
+  const day=Number(m[1]),month=Number(m[2])-1,year=Number(m[3]),hasTime=m[4]!==undefined,hour=Number(m[4]??0),minute=Number(m[5]??0);
+  const wall=new Date(Date.UTC(year,month,day,hour,minute));
+  if(wall.getUTCFullYear()!==year||wall.getUTCMonth()!==month||wall.getUTCDate()!==day||wall.getUTCHours()!==hour||wall.getUTCMinutes()!==minute)return null;
+  // Date-only closings are treated as end of that IST day so expiry stays conservative; timeVerified records the assumption.
+  const iso=hasTime?new Date(Date.UTC(year,month,day,hour-5,minute-30)).toISOString():new Date(Date.UTC(year,month,day,23-5,59-30)).toISOString();
+  return {dateLabel:`${String(day).padStart(2,"0")}/${String(month+1).padStart(2,"0")}/${year}`,iso,timeVerified:hasTime};
 }
 
 export function isExpired(closingAt: string | null, now = new Date()): boolean {
