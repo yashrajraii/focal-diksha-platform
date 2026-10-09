@@ -22,7 +22,7 @@ export function TenderDiscovery(){
   const [sources,setSources]=useState<SourceId[]>(enabledIds),[groups,setGroups]=useState<string[]>(Object.keys(groupMap)),[lookback,setLookback]=useState(30),[sort,setSort]=useState("newest"),[selected,setSelected]=useState<LiveTender|null>(null);
   const [progress,setProgress]=useState<Record<string,SourceResult|Checking>>({}),[runId,setRunId]=useState<string|null>(null);
   const abortRef=useRef<AbortController|null>(null);
-  const load=async()=>{try{const r=await fetch("/api/tenders",{cache:"no-store"});const j=await r.json();if(!r.ok)throw new Error(j.error||"Could not load tender discovery");setData(j);setError(null)}catch(e){setError(e instanceof Error?e.message:"Could not load tender discovery")}finally{setLoading(false)}};
+  const load=async()=>{try{const r=await fetch("/api/tenders",{cache:"no-store"});const j=await r.json() as ApiData & {error?:string};if(!r.ok)throw new Error(j.error||"Could not load tender discovery");setData(j);setError(null)}catch(e){setError(e instanceof Error?e.message:"Could not load tender discovery")}finally{setLoading(false)}};
   useEffect(()=>{const id=window.setTimeout(()=>void load(),0);return()=>window.clearTimeout(id)},[]);
   const toggleSource=(id:SourceId)=>setSources(s=>s.includes(id)?s.filter(x=>x!==id):[...s,id]);
   const toggleGroup=(g:string)=>setGroups(s=>s.includes(g)?s.filter(x=>x!==g):[...s,g]);
@@ -31,7 +31,7 @@ export function TenderDiscovery(){
     if(running||!sources.length)return;setRunning(true);setCancelled(false);setProgress({});setError(null);abortRef.current=new AbortController();
     let id:string|null=null;
     try{
-      const startRes=await fetch("/api/tenders",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",sources}),signal:abortRef.current.signal});const startJson=await startRes.json();if(!startRes.ok)throw new Error(startJson.error||"Could not start search");id=startJson.runId;setRunId(id);
+      const startRes=await fetch("/api/tenders",{method:"POST",headers:{"content-type":"application/json"},body:JSON.stringify({action:"start",sources}),signal:abortRef.current.signal});const startJson=await startRes.json() as {runId:string;error?:string};if(!startRes.ok)throw new Error(startJson.error||"Could not start search");id=startJson.runId;setRunId(id);
       for(const source of sources){
         if(abortRef.current.signal.aborted)break;setProgress(p=>({...p,[source]:{status:"checking",pagesChecked:0,listingsInspected:0,matchCount:0}}));
         // Large sources answer in batches; keep requesting until the server returns no cursor, summing counts and matches.

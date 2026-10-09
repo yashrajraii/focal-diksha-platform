@@ -1,3 +1,19 @@
+## Vercel / Next.js deployment
+
+The default commands now use native Next.js (`npm run dev`, `npm run build`, `npm start`). Vercel reads `vercel.json`, builds `.next`, and uses Node 22.x. Do not set the output directory to `dist`; that belongs to the original Sites/Vinext build.
+
+The sample UI requires no database credentials. Live tender discovery uses the existing D1 SQL schema over Cloudflare's server-side HTTP API on Vercel. Set these environment variables directly in Vercel (never commit their values):
+
+- `CLOUDFLARE_ACCOUNT_ID`
+- `CLOUDFLARE_D1_DATABASE_ID`
+- `CLOUDFLARE_D1_API_TOKEN` (scoped to D1 read/write on the intended account)
+
+Use a D1 database you control and apply `drizzle/0000_good_sandman.sql` once through its migration tooling before searching. A Sites-managed database may not be accessible from your own Cloudflare account; in that case provision your own D1 database. Until storage is configured, the live endpoint reports an explicit configuration error and the sample demo remains usable. The deployment does not automatically migrate or copy hosted data.
+
+The Next.js webpack config replaces the Cloudflare binding import with `lib/server/vercel-d1-env.ts`. Credentials stay server-side. Adapter tests use mock responses; a real database connection still requires verification after configuration.
+
+Original Sites workflows remain available as `dev:sites`, `build:sites`, and `start:sites`; the older Sites instructions below refer to those commands.
+
 # vinext-starter
 
 A clean full-stack starter running on [vinext](https://github.com/cloudflare/vinext), with optional Cloudflare D1 and Drizzle support.

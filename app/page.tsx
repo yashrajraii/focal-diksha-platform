@@ -45,7 +45,7 @@ export default function Home(){
   const go=(p:PageKey)=>{setPage(p);setMobileNav(false);setQuery("");scrollTo({top:0,behavior:"smooth"})};
   const logout=()=>{localStorage.removeItem("focal-diksha-demo-v1");setEntered(false);setPage("dashboard")};
   const reset=()=>{localStorage.setItem("focal-diksha-demo-v1",JSON.stringify({entered:true}));setPage("dashboard");setRange(7);setQuery("");setDetail(null);setResetOpen(false)};
-  const results=useMemo(()=>{if(query.trim().length<2)return[];const q=query.toLowerCase();return [
+  const results=useMemo<{title:string;meta:string;page:PageKey;id?:string}[]>(()=>{if(query.trim().length<2)return[];const q=query.toLowerCase();return [
     ...plates.filter(p=>`${p.thicknessMm}mm ${p.grade} ${p.location}`.toLowerCase().includes(q)).map(p=>({title:`${p.thicknessMm} mm ${p.grade} plate`,meta:`${tonnes(p.availableKg)} · ${p.location}`,page:"stock" as PageKey})),
     ...customers.filter(c=>`${c.name} ${c.city} ${c.contact}`.toLowerCase().includes(q)).map(c=>({title:c.name,meta:`${c.city} · ${c.firm}`,page:"customers" as PageKey})),
     ...tenders.filter(t=>`${t.title} ${t.buyer} ${t.category}`.toLowerCase().includes(q)).map(t=>({title:t.title,meta:`${t.buyer} · closes ${formatDate(t.closingAt)}`,page:"tenders" as PageKey,id:t.id}))].slice(0,7)},[query]);

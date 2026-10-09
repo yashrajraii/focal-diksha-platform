@@ -50,7 +50,7 @@ export async function POST(request:Request){
       const cached=await db().prepare(`SELECT * FROM source_status WHERE source=?`).bind(source).first<Record<string,unknown>>();
       let result:SourceResult;
       // Continuation batches always fetch; only a source's first batch may reuse a recent successful result.
-      if(!cursor&&shouldUseCache(cached?.last_success_at?String(cached.last_success_at):null)){
+      if(!cursor&&cached&&shouldUseCache(cached?.last_success_at?String(cached.last_success_at):null)){
         const rows=await db().prepare(`SELECT l.*, CASE WHEN s.tender_key IS NULL THEN 0 ELSE 1 END AS saved FROM live_tenders l LEFT JOIN saved_live_tenders s ON s.tender_key=l.key WHERE l.source=? AND (l.closing_at IS NULL OR l.closing_at>=?) ORDER BY COALESCE(l.published_at,l.first_discovered_at) DESC`).bind(source,new Date().toISOString()).all();
         result={source,sourceLabel:SOURCES[source].label,status:"partial",pagesChecked:Number(cached.pages_checked||0),listingsInspected:Number(cached.listings_inspected||0),matches:rows.results.map(r=>rowToTender(r as Record<string,unknown>)),checkedAt:String(cached.last_success_at),fromCache:true,coverage:SOURCES[source].reason};
       }else {
